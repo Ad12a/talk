@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baby Talk</title>
+<style>
+:root{
+  --bg:#fff7e8; --surface:#ffffff; --ink:#2b2a4c; --muted:#6a6890;
+  --accent:#ff7a59; --accent-ink:#ffffff; --line:#f0d9b5; --soft:#ffe2d8;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1d1b33; --surface:#2a2748; --ink:#fff3e0; --muted:#b9b5dc;
+    --accent:#ff8f70; --accent-ink:#2b1a14; --line:#3d3a66; --soft:#3a2f4a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1d1b33; --surface:#2a2748; --ink:#fff3e0; --muted:#b9b5dc;
+  --accent:#ff8f70; --accent-ink:#2b1a14; --line:#3d3a66; --soft:#3a2f4a;
+}
+:root{color-scheme:light dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Nunito","Trebuchet MS",system-ui,sans-serif;line-height:1.5}
+main{max-width:560px;margin:0 auto;padding:24px 18px 48px}
+h1{font-size:2rem;margin:0 0 4px;font-weight:800}
+p.sub{margin:0 0 24px;color:var(--muted)}
+h2{font-size:1.1rem;margin:0 0 12px}
+section{background:var(--surface);border:2px solid var(--line);border-radius:22px;padding:18px;margin-bottom:20px}
+.big{display:block;width:100%;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);
+  font:800 1.4rem "Nunito","Trebuchet MS",sans-serif;padding:26px 16px;cursor:pointer;
+  box-shadow:0 6px 0 rgba(0,0,0,.18);transition:transform .08s, box-shadow .08s}
+.big:active{transform:translateY(5px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.big.playing{animation:wiggle .5s ease-in-out infinite alternate}
+@keyframes wiggle{from{transform:rotate(-1.5deg)}to{transform:rotate(1.5deg)}}
+@media (prefers-reduced-motion: reduce){.big.playing{animation:none}}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+label{display:block;font-weight:700;margin:12px 0 6px}
+select,textarea,input[type=text]{width:100%;padding:12px;border-radius:14px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+textarea{min-height:110px;resize:vertical}
+.row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.btn{flex:1 1 140px;border:0;border-radius:14px;padding:14px;font:800 1rem "Nunito","Trebuchet MS",sans-serif;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn.alt{background:var(--soft);color:var(--ink)}
+.range{display:flex;align-items:center;gap:10px;margin-top:10px}
+.range span{min-width:70px;color:var(--muted);font-size:.9rem}
+input[type=range]{flex:1;accent-color:var(--accent)}
+#msg{min-height:1.4em;margin-top:10px;color:var(--muted);font-size:.95rem}
+</style>
+</head>
+<body>
+<main>
+  <h1>Baby Talk</h1>
+  <p class="sub">Press the big button for a baby phrase, or type any text and hear it in any language.</p>
+
+  <section aria-labelledby="h-baby">
+    <h2 id="h-baby">Baby button</h2>
+    <button class="big" id="babyBtn">Tap for baby sound</button>
+    <label for="babyText">Baby phrase (change it, a random one plays each tap)</label>
+    <select id="babyText" aria-label="Baby phrase"></select>
+  </section>
+
+  <section aria-labelledby="h-text">
+    <h2 id="h-text">Type text, hear it</h2>
+    <label for="txt">Your text</label>
+    <textarea id="txt" placeholder="Type or paste text in any language…"></textarea>
+    <label for="lang">Language</label>
+    <select id="lang"></select>
+    <label for="voice">Voice</label>
+    <select id="voice"></select>
+    <div class="range"><span>Speed</span><input id="rate" type="range" min="0.5" max="1.5" step="0.1" value="1" aria-label="Speed"></div>
+    <div class="range"><span>Pitch</span><input id="pitch" type="range" min="0.5" max="2" step="0.1" value="1" aria-label="Pitch"></div>
+    <div class="row">
+      <button class="btn" id="speakBtn">Speak</button>
+      <button class="btn alt" id="stopBtn">Stop</button>
+    </div>
+    <div id="msg" role="status"></div>
+  </section>
+</main>
+
+<script>
+(function(){
+  var synth = window.speechSynthesis;
+  var msg = document.getElementById('msg');
+  var voiceSel = document.getElementById('voice');
+  var langSel = document.getElementById('lang');
+  var babySel = document.getElementById('babyText');
+  var babyBtn = document.getElementById('babyBtn');
+  var voices = [];
+
+  var babyPhrases = [
+    {t:"Goo goo ga ga!", l:"en-US"},
+    {t:"Ba ba ba ba, da da da!", l:"en-US"},
+    {t:"Mama! Mama! Papa!", l:"en-US"},
+    {t:"Twinkle twinkle, little star, I love you so.", l:"en-US"},
+    {t:"Hush little baby, don’t you cry.", l:"en-US"},
+    {t:"Peek-a-boo! I see you!", l:"en-US"}
+  ];
+  babyPhrases.forEach(function(p,i){
+    var o=document.createElement('option'); o.value=i; o.textContent=p.t; babySel.appendChild(o);
+  });
+  var rnd=document.createElement('option'); rnd.value='random'; rnd.textContent='Random'; babySel.insertBefore(rnd,babySel.firstChild); babySel.value='random';
+
+  var langs = [
+    ["auto","Auto (match text)"],["en-US","English"],["es-ES","Spanish"],["fr-FR","French"],["de-DE","German"],
+    ["it-IT","Italian"],["pt-BR","Portuguese"],["ru-RU","Russian"],["zh-CN","Chinese"],["ja-JP","Japanese"],
+    ["ko-KR","Korean"],["hi-IN","Hindi"],["bn-BD","Bengali"],["ar-SA","Arabic"],["id-ID","Indonesian"],
+    ["ms-MY","Malay"],["ta-IN","Tamil"],["th-TH","Thai"],["vi-VN","Vietnamese"],["tr-TR","Turkish"],
+    ["nl-NL","Dutch"],["pl-PL","Polish"],["sv-SE","Swedish"],["el-GR","Greek"],["he-IL","Hebrew"],["ur-PK","Urdu"]
+  ];
+  langs.forEach(function(l){var o=document.createElement('option');o.value=l[0];o.textContent=l[1];langSel.appendChild(o);});
+
+  function loadVoices(){
+    try{ voices = synth.getVoices() || []; }catch(e){ voices=[]; }
+    fillVoices();
+  }
+  function fillVoices(){
+    var lang = langSel.value;
+    voiceSel.innerHTML='';
+    var def=document.createElement('option'); def.value=''; def.textContent='Default voice'; voiceSel.appendChild(def);
+    voices.forEach(function(v,i){
+      if(lang==='auto' || v.lang.toLowerCase().indexOf(lang.slice(0,2).toLowerCase())===0){
+        var o=document.createElement('option'); o.value=i; o.textContent=v.name+' ('+v.lang+')'; voiceSel.appendChild(o);
+      }
+    });
+  }
+  function detectLang(text){
+    if(/[\u3040-\u30ff]/.test(text)) return 'ja-JP';
+    if(/[\uac00-\ud7af]/.test(text)) return 'ko-KR';
+    if(/[\u4e00-\u9fff]/.test(text)) return 'zh-CN';
+    if(/[\u0900-\u097f]/.test(text)) return 'hi-IN';
+    if(/[\u0980-\u09ff]/.test(text)) return 'bn-BD';
+    if(/[\u0b80-\u0bff]/.test(text)) return 'ta-IN';
+    if(/[\u0e00-\u0e7f]/.test(text)) return 'th-TH';
+    if(/[\u0590-\u05ff]/.test(text)) return 'he-IL';
+    if(/[\u0600-\u06ff]/.test(text)) return 'ar-SA';
+    if(/[\u0400-\u04ff]/.test(text)) return 'ru-RU';
+    if(/[\u0370-\u03ff]/.test(text)) return 'el-GR';
+    return '';
+  }
+  function speak(text, lang, opts, onend){
+    if(!synth){ msg.textContent='Your browser does not support speech. Try Chrome, Edge or Safari.'; return; }
+    synth.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    if(lang) u.lang = lang;
+    opts = opts || {};
+    if(opts.voice) u.voice = opts.voice;
+    u.rate = opts.rate || 1; u.pitch = opts.pitch || 1;
+    u.onend = u.onerror = function(){ if(onend) onend(); };
+    synth.speak(u);
+  }
+
+  babyBtn.addEventListener('click', function(){
+    var idx = babySel.value==='random' ? Math.floor(Math.random()*babyPhrases.length) : +babySel.value;
+    var p = babyPhrases[idx];
+    babyBtn.classList.add('playing');
+    speak(p.t, p.l, {rate:0.9, pitch:1.9}, function(){ babyBtn.classList.remove('playing'); });
+  });
+
+  document.getElementById('speakBtn').addEventListener('click', function(){
+    var text = document.getElementById('txt').value.trim();
+    if(!text){ msg.textContent='Type some text first.'; return; }
+    var lang = langSel.value;
+    if(lang==='auto') lang = detectLang(text);
+    var v = voiceSel.value!=='' ? voices[+voiceSel.value] : null;
+    if(v) lang = v.lang;
+    msg.textContent = '';
+    if(lang && voices.length && !v){
+      var has = voices.some(function(x){return x.lang.toLowerCase().indexOf(lang.slice(0,2).toLowerCase())===0;});
+      if(!has) msg.textContent='No voice for this language is installed on your device. Add one in your system speech settings.';
+    }
+    speak(text, lang, {voice:v, rate:+document.getElementById('rate').value, pitch:+document.getElementById('pitch').value});
+  });
+  document.getElementById('stopBtn').addEventListener('click', function(){ if(synth) synth.cancel(); babyBtn.classList.remove('playing'); });
+  langSel.addEventListener('change', fillVoices);
+
+  if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
+  else msg.textContent='Your browser does not support speech. Try Chrome, Edge or Safari.';
+})();
+</script>
+</body>
+</html>
